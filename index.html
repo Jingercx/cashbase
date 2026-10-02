@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CashBase">
+  <title>CashBase</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root{--bg:#f5f6f8;--card:#fff;--text:#17191c;--muted:#6b7280;--line:#e5e7eb;--accent:#111827;--green:#16803c;--red:#c62828;--blue:#2563eb}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    header{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(12px);padding:14px 16px 8px}
+    h1{margin:0;font-size:22px}.sub{color:var(--muted);font-size:12px;margin-top:3px}
+    nav{display:flex;gap:6px;overflow:auto;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:58px;z-index:9}
+    nav button{border:0;background:transparent;padding:9px 11px;border-radius:10px;white-space:nowrap;color:var(--muted)} nav button.active{background:var(--accent);color:#fff}
+    main{max-width:900px;margin:auto;padding:16px 14px 90px}.page{display:none}.page.active{display:block}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+    .label{font-size:12px;color:var(--muted)} .big{font-size:23px;font-weight:700;margin-top:5px}.green{color:var(--green)}.red{color:var(--red)}
+    .section-title{font-weight:700;margin:18px 2px 9px}.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+    button,.btn{font:inherit;border:0;border-radius:10px;padding:10px 13px;background:var(--accent);color:white;cursor:pointer}
+    button.secondary,.btn.secondary{background:#eef0f3;color:var(--text)} button.danger{background:#fee2e2;color:#991b1b}
+    input,select{width:100%;padding:10px 11px;border:1px solid #d7dbe0;border-radius:10px;background:white;font:inherit}
+    label{display:block;font-size:12px;color:var(--muted);margin:9px 0 5px}.actions{display:flex;gap:8px;flex-wrap:wrap}
+    .tx{padding:12px 0;border-bottom:1px solid var(--line)} .tx:last-child{border-bottom:0}
+    .pill{font-size:11px;padding:4px 7px;border-radius:999px;background:#eef0f3;color:#555}
+    .empty{padding:28px 8px;text-align:center;color:var(--muted)}
+    .fab{position:fixed;right:18px;bottom:18px;width:56px;height:56px;border-radius:50%;font-size:26px;box-shadow:0 8px 25px #0002}
+    dialog{border:0;border-radius:18px;padding:0;width:min(560px,calc(100% - 24px));box-shadow:0 20px 60px #0004}dialog::backdrop{background:#0006}
+    .modal{padding:18px}.modal h2{margin:0 0 10px}.close{float:right;background:#eef0f3;color:#222;padding:6px 9px}
+    .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:#111827;color:white;padding:10px 14px;border-radius:10px;display:none;z-index:30}
+    table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:9px 5px;border-bottom:1px solid var(--line)}
+    @media(min-width:700px){.grid{grid-template-columns:repeat(4,1fr)}}
+  </style>
+</head>
+<body>
+<header><h1>CashBase</h1><div class="sub">Private cash-flow ledger · local storage only</div></header>
+<nav id="nav">
+  <button data-page="dashboard" class="active">Dashboard</button>
+  <button data-page="transactions">Transactions</button>
+  <button data-page="accounts">Accounts</button><button data-page="loans">Loans</button>
+  <button data-page="timeDeposits">Time Deposits</button>
+  <button data-page="cards">Credit Cards</button>
+  <button data-page="settings">Settings</button>
+</nav>
+
+<main>
+  <section id="dashboard" class="page active">
+    <div class="grid" id="dashboardBalances"></div>
+    <div class="section-title">This month</div>
+    <div class="grid3" id="monthSummary"></div>
+    <div class="section-title">Recoverable</div>
+    <div class="card" id="recoverSummary"></div>
+    <div class="section-title">Upcoming</div>
+    <div class="card" id="upcomingSummary"></div>
+    <div class="section-title">Recent transactions</div>
+    <div class="card" id="recent"></div>
+  </section>
+
+  <section id="transactions" class="page">
+    <div class="card">
+      <div class="row"><strong>Transactions</strong><button onclick="openTxModal()">+ Add</button></div>
+      <label>Month</label><input id="txMonth" type="month">
+      <label>Type</label><select id="txFilter"><option value="">All</option><option>IN</option><option>EXPENSE</option><option>TRANSFER</option><option>PAY_CARD</option><option>BORROW</option><option>REPAY_LOAN</option><option>BORROW</option><option>REPAY_LOAN</option></select>
+    </div>
+    <div class="card" id="txList"></div>
+  </section>
+
+  <section id="accounts" class="page">
+    <div class="card"><div class="row"><strong>Accounts</strong><button onclick="openAccountModal()">+ Account</button></div></div>
+    <div id="accountList"></div>
+  </section>
+
+  <section id="loans" class="page"><div class="card"><div class="row"><strong>Loans</strong><span class="sub">Money borrowed from others</span></div></div><div id="loanList"></div></section>
+
+  <section id="timeDeposits" class="page">
+    <div class="card"><div class="row"><strong>Time Deposits</strong><button onclick="openTDModal()">+ Time Deposit</button></div></div>
+    <div id="tdList"></div>
+  </section>
+
+  <section id="cards" class="page">
+    <div class="card"><div class="row"><strong>Credit Cards</strong><button onclick="openCardModal()">+ Card</button></div><p class="sub">Set statement date and payment due date. Use statement cut-off to check transactions against your statement.</p></div>
+    <div id="cardList"></div>
+  </section>
+
+  <section id="settings" class="page">
+    <div class="card">
+      <strong>Base currency</strong>
+      <label>Currency</label><input id="baseCurrency" maxlength="5">
+      <button onclick="saveSettings()">Save</button>
+    </div>
+    <div class="card">
+      <strong>Backup</strong><p class="sub">Your data stays in this browser. Export a JSON backup regularly.</p>
+      <div class="actions"><button onclick="exportData()">Export JSON</button><button class="secondary" onclick="document.getElementById('importFile').click()">Import JSON</button><input id="importFile" type="file" accept=".json" hidden></div>
+    </div>
+    <div class="card">
+      <strong>Danger zone</strong><p class="sub">Delete all local CashBase data.</p><button class="danger" onclick="resetData()">Reset all data</button>
+    </div>
+  </section>
+</main>
+
+<button class="fab" onclick="openTxModal()">+</button>
+<div id="toast" class="toast"></div>
+
+<dialog id="txDialog"><div class="modal"><button class="close" onclick="txDialog.close()">✕</button><h2 id="txTitle">Add transaction</h2>
+<form id="txForm">
+<input type="hidden" id="txId">
+<label>Type</label><select id="txType" required><option>IN</option><option>EXPENSE</option><option>TRANSFER</option><option>PAY_CARD</option><option>BORROW</option><option>REPAY_LOAN</option></select>
+<label>Date</label><input id="txDate" type="date" required>
+<label>Description</label><input id="txDesc" required>
+<div id="txDynamic"></div>
+<div class="actions" style="margin-top:14px"><button>Save</button><button type="button" class="secondary" onclick="txDialog.close()">Cancel</button></div>
+</form></div></dialog>
+
+<dialog id="accountDialog"><div class="modal"><button class="close" onclick="accountDialog.close()">✕</button><h2>Account</h2>
+<form id="accountForm"><input type="hidden" id="accountId"><label>Name</label><input id="accountName" required><label>Type</label><select id="accountType"><option value="cash">Cash</option><option value="bank">Bank</option><option value="credit_card">Credit Card</option><option value="loan_payable">Loan Payable</option></select><label>Currency</label><input id="accountCurrency" value="HKD" maxlength="5"><label>Opening balance</label><input id="accountOpening" type="number" step="0.01" value="0"><div class="actions" style="margin-top:14px"><button>Save</button><button type="button" class="secondary" onclick="accountDialog.close()">Cancel</button></div></form></div></dialog>
+
+<dialog id="tdDialog"><div class="modal"><button class="close" onclick="tdDialog.close()">✕</button><h2>Time Deposit</h2>
+<form id="tdForm"><input type="hidden" id="tdId"><label>Name</label><input id="tdName" placeholder="Time Deposit 1" required><label>Bank / source account</label><select id="tdAccount"></select><label>Principal</label><input id="tdPrincipal" type="number" step="0.01" required><label>Currency</label><input id="tdCurrency" value="HKD" maxlength="5"><label>Interest rate %</label><input id="tdRate" type="number" step="0.0001"><label>Start date</label><input id="tdStart" type="date" required><label>Maturity date</label><input id="tdMaturity" type="date" required><label>Status</label><select id="tdStatus"><option>Active</option><option>Matured</option><option>Renewed</option></select><div class="actions" style="margin-top:14px"><button>Save</button><button type="button" class="secondary" onclick="tdDialog.close()">Cancel</button></div></form></div></dialog>
+
+<dialog id="cardDialog"><div class="modal"><button class="close" onclick="cardDialog.close()">✕</button><h2>Credit Card</h2>
+<form id="cardForm"><input type="hidden" id="cardId"><label>Card account</label><select id="cardAccount"></select><label>Statement day</label><input id="cardStatementDay" type="number" min="1" max="31" required><label>Payment due day</label><input id="cardDueDay" type="number" min="1" max="31" required><div class="actions" style="margin-top:14px"><button>Save</button><button type="button" class="secondary" onclick="cardDialog.close()">Cancel</button></div></form></div></dialog>
+
+<script>
+const KEY="cashbase_v01";
+const $=id=>document.getElementById(id);
+const uid=()=>crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2);
+const today=()=>new Date().toISOString().slice(0,10);
+const money=(n,currency=state.settings.baseCurrency)=>`${currency} ${Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+let state=load();
+
+function blankState(){return {version:1,settings:{baseCurrency:"HKD"},accounts:[
+  {id:uid(),name:"Cash",type:"cash",currency:"HKD",opening:0}
+],transactions:[],timeDeposits:[],cards:[]}}
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||blankState()}catch(e){return blankState()}}
+function save(){localStorage.setItem(KEY,JSON.stringify(state));renderAll()}
+function account(id){return state.accounts.find(a=>a.id===id)}
+function txBaseAmount(t){return Number(t.baseAmount ?? t.amount ?? 0)}
+function accountBalance(id){
+  const a=account(id); if(!a)return 0;
+  let b=Number(a.opening||0);
+  for(const t of state.transactions){const x=txBaseAmount(t);
+    if(t.type==="IN"&&t.accountId===id)b+=x;
+    if(t.type==="EXPENSE"&&t.accountId===id)b-=x;
+    if(t.type==="TRANSFER"){if(t.fromId===id)b-=x;if(t.toId===id)b+=x}
+    if(t.type==="PAY_CARD"){if(t.fromId===id)b+=account(t.fromId)?.type==="credit_card"?x:-x;if(t.cardId===id)b-=x}
+    if(t.type==="BORROW"){if(t.accountId===id)b+=x;if(t.loanAccountId===id)b+=x}
+    if(t.type==="REPAY_LOAN"){if(t.fromId===id)b-=x;if(t.loanAccountId===id)b-=x}
+  } return b;
+}
+function cardOutstanding(id){return -accountBalance(id)}
+function netByCurrency(){const out={};for(const a of state.accounts){const c=(a.currency||state.settings.baseCurrency).toUpperCase();const b=accountBalance(a.id);out[c]=(out[c]||0)+((a.type==="credit_card"||a.type==="loan_payable")?-b:(a.type==="cash"||a.type==="bank"?b:0));}for(const t of state.timeDeposits.filter(x=>x.status==="Active")){const c=(t.currency||state.settings.baseCurrency).toUpperCase();out[c]=(out[c]||0)+Number(t.principal||0);}return out;}
+
+function fmtDate(d){return d?new Date(d+"T00:00:00").toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}):""}
+function showToast(s){$("toast").textContent=s;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",1800)}
+
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));$(b.dataset.page).classList.add("active");renderAll()});
+
+function renderAll(){renderDashboard();renderTransactions();renderAccounts();renderLoans();renderTD();renderCards();$("baseCurrency").value=state.settings.baseCurrency}
+function renderDashboard(){
+  const bal=state.accounts.filter(a=>["cash","bank"].includes(a.type));
+  const cards=state.accounts.filter(a=>a.type==="credit_card");
+  const nets=netByCurrency(); const netCards=Object.entries(nets).map(([c,v])=>`<div class="card"><div class="label">Net Balance · ${esc(c)}</div><div class="big ${v<0?"red":""}">${money(v,c)}</div><div class="sub">No currency conversion</div></div>`);
+  $("dashboardBalances").innerHTML=[...netCards,...bal.map(a=>`<div class="card"><div class="label">${esc(a.name)}</div><div class="big">${money(accountBalance(a.id),a.currency)}</div></div>`),...cards.map(a=>`<div class="card"><div class="label">${esc(a.name)} · card owed</div><div class="big red">${money(cardOutstanding(a.id),a.currency)}</div></div>`)].join("");
+  const ym=new Date().toISOString().slice(0,7);
+  const ts=state.transactions.filter(t=>t.date.startsWith(ym));
+  const income=ts.filter(t=>t.type==="IN").reduce((s,t)=>s+txBaseAmount(t),0);
+  const expense=ts.filter(t=>t.type==="EXPENSE").reduce((s,t)=>s+txBaseAmount(t),0)+ts.filter(t=>t.type==="BORROW"||t.type==="REPAY_LOAN").reduce((s,t)=>s+(Number(t.interestBase)||0),0);
+  $("monthSummary").innerHTML=`<div class="card"><div class="label">Income</div><div class="big green">${money(income)}</div></div><div class="card"><div class="label">Expense</div><div class="big red">${money(expense)}</div></div><div class="card"><div class="label">Net</div><div class="big">${money(income-expense)}</div></div>`;
+  let rec=0;
+  state.transactions.filter(t=>t.type==="EXPENSE"&&t.recoverable).forEach(t=>rec+=Math.max(0,txBaseAmount(t)-(t.recovered||0)));
+  $("recoverSummary").innerHTML=rec?`<div class="row"><span>Outstanding recovery</span><strong>${money(rec)}</strong></div>`:"Nothing outstanding.";
+  const upcoming=[...state.timeDeposits.filter(t=>t.status==="Active").map(t=>({date:t.maturity,label:`${t.name} matures`,amount:t.principal})),
+    ...state.cards.map(c=>({date:nextDay(c.dueDay),label:`${account(c.accountId)?.name||"Card"} payment due`,amount:cardOutstanding(c.accountId)}))].sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
+  $("upcomingSummary").innerHTML=upcoming.length?upcoming.map(x=>`<div class="row tx"><span>${fmtDate(x.date)}<br><span class="sub">${esc(x.label)}</span></span><strong>${money(x.amount)}</strong></div>`).join(""):"No upcoming items.";
+  const recent=[...state.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  $("recent").innerHTML=recent.length?recent.map(txHtml).join(""):`<div class="empty">No transactions yet.</div>`;
+}
+function nextDay(day){const d=new Date();let y=d.getFullYear(),m=d.getMonth();let x=new Date(y,m,Math.min(Number(day),28));if(x<d)x=new Date(y,m+1,Math.min(Number(day),28));return x.toISOString().slice(0,10)}
+function txHtml(t){
+  let amount=txBaseAmount(t), sign=t.type==="IN"||t.type==="TRANSFER"&&t.toId===t.accountId?"+":"";
+  if(t.type==="EXPENSE"||t.type==="PAY_CARD"||t.type==="REPAY_LOAN")sign="-";
+  let who=t.type==="TRANSFER"?`${account(t.fromId)?.name||"?"} → ${account(t.toId)?.name||"?"}`:t.type==="PAY_CARD"?`${account(t.fromId)?.name||"?"} → ${account(t.cardId)?.name||"?"}`:t.type==="BORROW"?`${esc(t.borrower||"lender")} → ${account(t.accountId)?.name||"?"}`:t.type==="REPAY_LOAN"?`${account(t.fromId)?.name||"?"} → loan`:account(t.accountId)?.name||"";
+  return `<div class="tx"><div class="row"><div><strong>${esc(t.description||t.type)}</strong><div class="sub">${fmtDate(t.date)} · ${t.type} · ${esc(who)}</div></div><strong class="${sign==="-"?"red":"green"}">${sign}${money(amount,t.currency||state.settings.baseCurrency)}</strong></div></div>`;
+}
+function renderTransactions(){
+  const month=$("txMonth").value, filter=$("txFilter").value;
+  let arr=[...state.transactions].sort((a,b)=>b.date.localeCompare(a.date));
+  if(month)arr=arr.filter(t=>t.date.startsWith(month)); if(filter)arr=arr.filter(t=>t.type===filter);
+  $("txList").innerHTML=arr.length?arr.map((t,i)=>`${txHtml(t)}<div class="actions"><button class="secondary" onclick="editTx('${t.id}')">Edit</button><button class="danger" onclick="deleteTx('${t.id}')">Delete</button></div>`).join(""):`<div class="empty">No transactions.</div>`;
+}
+$("txMonth").value=new Date().toISOString().slice(0,7);$("txMonth").oninput=renderTransactions;$("txFilter").onchange=renderTransactions;
+
+function openTxModal(id=null){
+  $("txForm").reset();$("txId").value=id||"";$("txDate").value=today();$("txType").value="IN";
+  if(id){const t=state.transactions.find(x=>x.id===id);$("txId").value=id;$("txDate").value=t.date;$("txType").value=t.type;$("txDesc").value=t.description||""}
+  renderTxDynamic(id);txDialog.showModal();
+}
+function editTx(id){openTxModal(id)}
+$("txType").onchange=()=>renderTxDynamic($("txId").value);
+function optionsAccounts(filter=""){return state.accounts.filter(a=>!filter||a.type===filter).map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}
+function renderTxDynamic(id){
+  const t=id?state.transactions.find(x=>x.id===id):null, type=$("txType").value;
+  let h="";
+  if(type==="IN")h=`<label>Amount (base currency)</label><input id="txAmount" type="number" step="0.01" required><label>Account</label><select id="txAccount">${optionsAccounts()}</select><label>Note</label><input id="txNote">`;
+  if(type==="EXPENSE")h=`<label>Original amount</label><input id="txAmount" type="number" step="0.01" required><label>Currency</label><input id="txCurrency" value="${state.settings.baseCurrency}" maxlength="5"><label>Base-currency amount</label><input id="txBase" type="number" step="0.01" required><label>Paid by</label><select id="txAccount">${optionsAccounts()}</select><label>Category</label><input id="txCategory"><label>Recoverable?</label><select id="txRecover"><option value="0">No</option><option value="1">Yes</option></select>`;
+  if(type==="TRANSFER")h=`<label>Amount</label><input id="txAmount" type="number" step="0.01" required><label>From</label><select id="txFrom">${optionsAccounts()}</select><label>To</label><select id="txTo">${optionsAccounts()}</select>`;
+  if(type==="BORROW")h=`<label>Borrowed principal</label><input id="txAmount" type="number" step="0.01" required><label>Interest / fee incurred</label><input id="txInterest" type="number" step="0.01" value="0"><label>Currency</label><input id="txCurrency" value="${state.settings.baseCurrency}" maxlength="5"><label>Base-currency principal</label><input id="txBase" type="number" step="0.01" required><label>Base-currency interest / fee</label><input id="txInterestBase" type="number" step="0.01" value="0"><label>Cash / bank received into</label><select id="txAccount">${optionsAccounts()}</select><label>Loan payable account</label><select id="txLoanAccount">${state.accounts.filter(a=>a.type==="loan_payable").map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}</select><label>Lender</label><input id="txBorrower" placeholder="Who lent you the money" required>`;
+  if(type==="REPAY_LOAN")h=`<label>Total repayment</label><input id="txAmount" type="number" step="0.01" required><label>Principal portion</label><input id="txPrincipal" type="number" step="0.01" required><label>Interest portion (expense)</label><input id="txInterest" type="number" step="0.01" value="0"><label>Pay from</label><select id="txFrom">${optionsAccounts()}</select><label>Loan payable account</label><select id="txLoanAccount">${state.accounts.filter(a=>a.type==="loan_payable").map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}</select>`;
+  if(type==="PAY_CARD")h=`<label>Amount</label><input id="txAmount" type="number" step="0.01" required><label>Pay from</label><select id="txFrom" required>${optionsAccounts()}</select><label>Credit card</label><select id="txCard" required>${optionsAccounts("credit_card")}</select>`;
+  $("txDynamic").innerHTML=h;
+  if(t){
+    $("txAmount").value=t.amount??t.baseAmount??0;
+    if($("txBase")){$("txBase").value=t.baseAmount??t.amount;$("txCurrency").value=t.currency||state.settings.baseCurrency;if($("txCategory"))$("txCategory").value=t.category||"";if($("txRecover"))$("txRecover").value=t.recoverable?"1":"0";if($("txInterest"))$("txInterest").value=t.interest||0;if($("txInterestBase"))$("txInterestBase").value=t.interestBase||0;if($("txBorrower"))$("txBorrower").value=t.borrower||"";if($("txPrincipal"))$("txPrincipal").value=t.principal||0;if($("txLoanAccount"))$("txLoanAccount").value=t.loanAccountId||""}
+    if($("txAccount"))$("txAccount").value=t.accountId||"";
+    if($("txFrom"))$("txFrom").value=t.fromId||"";
+    if($("txTo"))$("txTo").value=t.toId||"";
+    if($("txCard"))$("txCard").value=t.cardId||"";
+  }
+}
+$("txForm").onsubmit=e=>{e.preventDefault();const id=$("txId").value,type=$("txType").value;let t={id:id||uid(),type,date:$("txDate").value,description:$("txDesc").value};
+  if(type==="IN"){t.amount=+$("txAmount").value;t.baseAmount=t.amount;t.currency=state.settings.baseCurrency;t.accountId=$("txAccount").value}
+  if(type==="EXPENSE"){t.amount=+$("txAmount").value;t.currency=$("txCurrency").value;t.baseAmount=+$("txBase").value;t.accountId=$("txAccount").value;t.category=$("txCategory").value;t.recoverable=$("txRecover").value==="1";t.recovered=id?(state.transactions.find(x=>x.id===id)?.recovered||0):0}
+  if(type==="TRANSFER"){t.amount=+$("txAmount").value;t.baseAmount=t.amount;t.currency=state.settings.baseCurrency;t.fromId=$("txFrom").value;t.toId=$("txTo").value}
+  if(type==="PAY_CARD"){t.amount=+$("txAmount").value;t.baseAmount=t.amount;t.currency=state.settings.baseCurrency;t.fromId=$("txFrom").value;t.cardId=$("txCard").value}
+  const i=state.transactions.findIndex(x=>x.id===t.id);if(i>=0)state.transactions[i]=t;else state.transactions.push(t);save();txDialog.close();showToast("Saved")}
+function deleteTx(id){if(confirm("Delete this transaction?")){state.transactions=state.transactions.filter(t=>t.id!==id);save()}}
+function openAccountModal(id=null){$("accountForm").reset();$("accountId").value=id||"";$("accountCurrency").value=state.settings.baseCurrency;
+ if(id){const a=account(id);$("accountId").value=id;$("accountName").value=a.name;$("accountType").value=a.type;$("accountCurrency").value=a.currency;$("accountOpening").value=a.opening}
+ accountDialog.showModal()}
+$("accountForm").onsubmit=e=>{e.preventDefault();const id=$("accountId").value;const a={id:id||uid(),name:$("accountName").value,type:$("accountType").value,currency:$("accountCurrency").value,opening:+$("accountOpening").value};const i=state.accounts.findIndex(x=>x.id===a.id);if(i>=0)state.accounts[i]=a;else state.accounts.push(a);save();accountDialog.close()}
+function renderAccounts(){$("accountList").innerHTML=state.accounts.map(a=>`<div class="card"><div class="row"><div><strong>${esc(a.name)}</strong><div class="sub">${a.type} · Opening ${money(a.opening,a.currency)}</div></div><strong class="${a.type==="credit_card"?"red":""}">${money(accountBalance(a.id),a.currency)}</strong></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="openAccountModal('${a.id}')">Edit</button></div></div>`).join("")}
+
+function renderLoans(){const loans=state.accounts.filter(a=>a.type==="loan_payable");$("loanList").innerHTML=loans.length?loans.map(a=>{const outstanding=accountBalance(a.id);const interest=state.transactions.filter(t=>t.type==="BORROW"&&t.loanAccountId===a.id).reduce((x,t)=>x+(Number(t.interestBase)||0),0)+state.transactions.filter(t=>t.type==="REPAY_LOAN"&&t.loanAccountId===a.id).reduce((x,t)=>x+(Number(t.interestBase)||0),0);return `<div class="card"><div class="row"><div><strong>${esc(a.name)}</strong><div class="sub">Amount you owe · ${esc(a.currency)}</div></div><strong class="red">${money(outstanding,a.currency)}</strong></div><div class="sub" style="margin-top:8px">Interest/fees recorded: ${money(interest,a.currency)}</div></div>`}).join(""):`<div class="card empty">Create a “Loan Payable” account, then record a BORROW transaction.</div>`;}
+
+function openTDModal(id=null){$("tdForm").reset();$("tdId").value=id||"";$("tdStart").value=today();$("tdCurrency").value=state.settings.baseCurrency;$("tdAccount").innerHTML=state.accounts.filter(a=>a.type!=="credit_card").map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("");
+ if(id){const t=state.timeDeposits.find(x=>x.id===id);for(const k of ["id","name","principal","currency","rate","start","maturity","status"])if($( "td"+k.charAt(0).toUpperCase()+k.slice(1))){} $("tdId").value=t.id;$("tdName").value=t.name;$("tdPrincipal").value=t.principal;$("tdCurrency").value=t.currency;$("tdRate").value=t.rate;$("tdStart").value=t.start;$("tdMaturity").value=t.maturity;$("tdStatus").value=t.status;$("tdAccount").value=t.accountId}
+ tdDialog.showModal()}
+$("tdForm").onsubmit=e=>{e.preventDefault();const t={id:$("tdId").value||uid(),name:$("tdName").value,accountId:$("tdAccount").value,principal:+$("tdPrincipal").value,currency:$("tdCurrency").value,rate:+$("tdRate").value,start:$("tdStart").value,maturity:$("tdMaturity").value,status:$("tdStatus").value};const i=state.timeDeposits.findIndex(x=>x.id===t.id);if(i>=0)state.timeDeposits[i]=t;else state.timeDeposits.push(t);save();tdDialog.close()}
+function renderTD(){$("tdList").innerHTML=state.timeDeposits.length?state.timeDeposits.map(t=>`<div class="card"><div class="row"><div><strong>${esc(t.name)}</strong><div class="sub">${esc(account(t.accountId)?.name||"")} · ${fmtDate(t.start)} → ${fmtDate(t.maturity)}</div></div><span class="pill">${t.status}</span></div><div class="big">${money(t.principal,t.currency)}</div><div class="sub">Interest ${t.rate||0}%</div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="openTDModal('${t.id}')">Edit</button></div></div>`).join(""):`<div class="card empty">No time deposits.</div>`}
+
+function openCardModal(id=null){$("cardForm").reset();$("cardId").value=id||"";$("cardAccount").innerHTML=state.accounts.filter(a=>a.type==="credit_card").map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("");
+ if(id){const c=state.cards.find(x=>x.id===id);$("cardId").value=c.id;$("cardAccount").value=c.accountId;$("cardStatementDay").value=c.statementDay;$("cardDueDay").value=c.dueDay}
+ cardDialog.showModal()}
+$("cardForm").onsubmit=e=>{e.preventDefault();const c={id:$("cardId").value||uid(),accountId:$("cardAccount").value,statementDay:+$("cardStatementDay").value,dueDay:+$("cardDueDay").value};const i=state.cards.findIndex(x=>x.id===c.id);if(i>=0)state.cards[i]=c;else state.cards.push(c);save();cardDialog.close()}
+function renderCards(){$("cardList").innerHTML=state.accounts.filter(a=>a.type==="credit_card").map(a=>{const c=state.cards.find(x=>x.accountId===a.id);return `<div class="card"><div class="row"><div><strong>${esc(a.name)}</strong><div class="sub">Statement day: ${c?.statementDay??"—"} · Due day: ${c?.dueDay??"—"}</div></div><strong class="red">${money(cardOutstanding(a.id),a.currency)}</strong></div><div class="actions" style="margin-top:10px"><button onclick="statementCheck('${a.id}')">Check statement</button>${c?`<button class="secondary" onclick="openCardModal('${c.id}')">Edit</button>`:""}</div></div>`}).join("")||`<div class="card empty">Create a Credit Card account first.</div>`}
+function statementCheck(cardId){
+ const c=state.cards.find(x=>x.accountId===cardId);if(!c)return;
+ const end=prompt("Statement cut-off date (YYYY-MM-DD):",today());if(!end)return;
+ const start=new Date(end+"T00:00:00");start.setMonth(start.getMonth()-1);const s=start.toISOString().slice(0,10);
+ const arr=state.transactions.filter(t=>t.type==="EXPENSE"&&t.accountId===cardId&&t.date>s&&t.date<=end);
+ const total=arr.reduce((x,t)=>x+txBaseAmount(t),0);
+ alert(`${account(cardId).name}\n\nPeriod: ${s} → ${end}\nTransactions: ${arr.length}\nTotal: ${money(total)}\n\nYou can use the Transactions page to inspect the individual entries.`);
+}
+function saveSettings(){state.settings.baseCurrency=$("baseCurrency").value.trim()||"HKD";save();showToast("Settings saved")}
+function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`cashbase-backup-${today()}.json`;a.click();URL.revokeObjectURL(a.href)}
+$("importFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.accounts||!x.transactions)throw Error();state=x;save();showToast("Imported")}catch{alert("Invalid CashBase JSON backup.")}};r.readAsText(f)}
+function resetData(){if(confirm("Delete ALL CashBase data from this browser?")){localStorage.removeItem(KEY);state=blankState();renderAll();showToast("Reset complete")}}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+renderAll();
+if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script>
+</body>
+</html>
