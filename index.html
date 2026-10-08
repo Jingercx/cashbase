@@ -64,7 +64,7 @@
     <div class="card">
       <div class="row"><strong>Transactions</strong><button onclick="openTxModal()">+ Add</button></div>
       <label>Month</label><input id="txMonth" type="month">
-      <label>Type</label><select id="txFilter"><option value="">All</option><option>IN</option><option>EXPENSE</option><option>TRANSFER</option><option>PAY_CARD</option><option>BORROW</option><option>REPAY_LOAN</option><option>BORROW</option><option>REPAY_LOAN</option></select>
+      <label>Type</label><select id="txFilter"><option value="">All</option><option>IN</option><option>EXPENSE</option><option>TRANSFER</option><option>PAY_CARD</option><option>BORROW</option><option>REPAY_LOAN</option></select>
     </div>
     <div class="card" id="txList"></div>
   </section>
@@ -87,6 +87,14 @@
   </section>
 
   <section id="settings" class="page">
+    <div class="card">
+      <strong>Balance rules</strong>
+      <p class="sub"><strong>Assets:</strong> Cash (+), Bank (+) &nbsp; | &nbsp; <strong>Liabilities:</strong> Credit Card (-), Loan (-)</p>
+      <p class="sub"><strong>Net Balance</strong> = Cash + Bank + Credit Card + Loan. Liability balances are already stored as negative values.</p>
+      <p class="sub"><strong>Expense (-):</strong> reduces Cash/Bank; makes Credit Card more negative.</p>
+      <p class="sub"><strong>Income (+):</strong> increases Cash/Bank; makes Credit Card less negative.</p>
+      <p class="sub"><strong>Transfer:</strong> From (-), To (+). A card payment reduces Cash/Bank and increases the Credit Card balance toward zero.</p>
+    </div>
     <div class="card">
       <strong>Base currency</strong>
       <label>Currency</label><input id="baseCurrency" maxlength="5">
@@ -146,13 +154,14 @@ function accountBalance(id){
     if(t.type==="IN"&&t.accountId===id)b+=x;
     if(t.type==="EXPENSE"&&t.accountId===id)b-=x;
     if(t.type==="TRANSFER"){if(t.fromId===id)b-=x;if(t.toId===id)b+=x}
-    if(t.type==="PAY_CARD"){if(t.fromId===id)b+=account(t.fromId)?.type==="credit_card"?x:-x;if(t.cardId===id)b-=x}
-    if(t.type==="BORROW"){if(t.accountId===id)b+=x;if(t.loanAccountId===id)b+=x}
-    if(t.type==="REPAY_LOAN"){if(t.fromId===id)b-=x;if(t.loanAccountId===id)b-=x}
+    // Signed-balance rule: assets are positive; liabilities are negative.
+    if(t.type==="PAY_CARD"){if(t.fromId===id)b-=x;if(t.cardId===id)b+=x}
+    if(t.type==="BORROW"){if(t.accountId===id)b+=x;if(t.loanAccountId===id)b-=x}
+    if(t.type==="REPAY_LOAN"){if(t.fromId===id)b-=x;if(t.loanAccountId===id)b+=Number(t.principal??x)}
   } return b;
 }
 function cardOutstanding(id){return -accountBalance(id)}
-function netByCurrency(){const out={};for(const a of state.accounts){const c=(a.currency||state.settings.baseCurrency).toUpperCase();const b=accountBalance(a.id);out[c]=(out[c]||0)+((a.type==="credit_card"||a.type==="loan_payable")?-b:(a.type==="cash"||a.type==="bank"?b:0));}for(const t of state.timeDeposits.filter(x=>x.status==="Active")){const c=(t.currency||state.settings.baseCurrency).toUpperCase();out[c]=(out[c]||0)+Number(t.principal||0);}return out;}
+function netByCurrency(){const out={};for(const a of state.accounts){const c=(a.currency||state.settings.baseCurrency).toUpperCase();const b=accountBalance(a.id);if(["cash","bank","credit_card","loan_payable"].includes(a.type))out[c]=(out[c]||0)+b;}for(const t of state.timeDeposits.filter(x=>x.status==="Active")){const c=(t.currency||state.settings.baseCurrency).toUpperCase();out[c]=(out[c]||0)+Number(t.principal||0);}return out;}
 
 function fmtDate(d){return d?new Date(d+"T00:00:00").toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}):""}
 function showToast(s){$("toast").textContent=s;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",1800)}
@@ -210,7 +219,7 @@ function renderTxDynamic(id){
   if(type==="TRANSFER")h=`<label>Amount</label><input id="txAmount" type="number" step="0.01" required><label>From</label><select id="txFrom">${optionsAccounts()}</select><label>To</label><select id="txTo">${optionsAccounts()}</select>`;
   if(type==="BORROW")h=`<label>Borrowed principal</label><input id="txAmount" type="number" step="0.01" required><label>Interest / fee incurred</label><input id="txInterest" type="number" step="0.01" value="0"><label>Currency</label><input id="txCurrency" value="${state.settings.baseCurrency}" maxlength="5"><label>Base-currency principal</label><input id="txBase" type="number" step="0.01" required><label>Base-currency interest / fee</label><input id="txInterestBase" type="number" step="0.01" value="0"><label>Cash / bank received into</label><select id="txAccount">${optionsAccounts()}</select><label>Loan payable account</label><select id="txLoanAccount">${state.accounts.filter(a=>a.type==="loan_payable").map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}</select><label>Lender</label><input id="txBorrower" placeholder="Who lent you the money" required>`;
   if(type==="REPAY_LOAN")h=`<label>Total repayment</label><input id="txAmount" type="number" step="0.01" required><label>Principal portion</label><input id="txPrincipal" type="number" step="0.01" required><label>Interest portion (expense)</label><input id="txInterest" type="number" step="0.01" value="0"><label>Pay from</label><select id="txFrom">${optionsAccounts()}</select><label>Loan payable account</label><select id="txLoanAccount">${state.accounts.filter(a=>a.type==="loan_payable").map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}</select>`;
-  if(type==="PAY_CARD")h=`<label>Amount</label><input id="txAmount" type="number" step="0.01" required><label>Pay from</label><select id="txFrom" required>${optionsAccounts()}</select><label>Credit card</label><select id="txCard" required>${optionsAccounts("credit_card")}</select>`;
+  if(type==="PAY_CARD")h=`<label>Amount</label><input id="txAmount" type="number" step="0.01" required><label>Pay from</label><select id="txFrom" required>${state.accounts.filter(a=>["cash","bank"].includes(a.type)).map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}</select><label>Credit card</label><select id="txCard" required>${optionsAccounts("credit_card")}</select>`;
   $("txDynamic").innerHTML=h;
   if(t){
     $("txAmount").value=t.amount??t.baseAmount??0;
@@ -226,6 +235,8 @@ $("txForm").onsubmit=e=>{e.preventDefault();const id=$("txId").value,type=$("txT
   if(type==="EXPENSE"){t.amount=+$("txAmount").value;t.currency=$("txCurrency").value;t.baseAmount=+$("txBase").value;t.accountId=$("txAccount").value;t.category=$("txCategory").value;t.recoverable=$("txRecover").value==="1";t.recovered=id?(state.transactions.find(x=>x.id===id)?.recovered||0):0}
   if(type==="TRANSFER"){t.amount=+$("txAmount").value;t.baseAmount=t.amount;t.currency=state.settings.baseCurrency;t.fromId=$("txFrom").value;t.toId=$("txTo").value}
   if(type==="PAY_CARD"){t.amount=+$("txAmount").value;t.baseAmount=t.amount;t.currency=state.settings.baseCurrency;t.fromId=$("txFrom").value;t.cardId=$("txCard").value}
+  if(type==="BORROW"){t.amount=+$("txAmount").value;t.baseAmount=+$("txBase").value;t.currency=$("txCurrency").value;t.interest=+$("txInterest").value;t.interestBase=+$("txInterestBase").value;t.accountId=$("txAccount").value;t.loanAccountId=$("txLoanAccount").value;t.borrower=$("txBorrower").value}
+  if(type==="REPAY_LOAN"){t.amount=+$("txAmount").value;t.baseAmount=t.amount;t.currency=state.settings.baseCurrency;t.principal=+$("txPrincipal").value;t.interest=+$("txInterest").value;t.interestBase=t.interest;t.fromId=$("txFrom").value;t.loanAccountId=$("txLoanAccount").value}
   const i=state.transactions.findIndex(x=>x.id===t.id);if(i>=0)state.transactions[i]=t;else state.transactions.push(t);save();txDialog.close();showToast("Saved")}
 function deleteTx(id){if(confirm("Delete this transaction?")){state.transactions=state.transactions.filter(t=>t.id!==id);save()}}
 function openAccountModal(id=null){$("accountForm").reset();$("accountId").value=id||"";$("accountCurrency").value=state.settings.baseCurrency;
